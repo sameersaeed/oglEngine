@@ -6,6 +6,11 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
+
+#include "../imgui/imgui.h"
+#include "../imgui/imgui_impl_glfw.h"
+#include "../imgui/imgui_impl_opengl3.h"
+
 #include "../Camera/Camera.h"
 #include "../Shader/Shader.h"
 #include "../Texture/Texture.h"
@@ -22,14 +27,20 @@ Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
 float lastX = SCREEN_WIDTH / 2.0f;
 float lastY = SCREEN_HEIGHT / 2.0f;
-bool firstMouse = true;
+bool firstMouse = false;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-
 int main()
 {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // keyboard controls
+    // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;      // docking 
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // gamepad controls
+
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -45,6 +56,10 @@ int main()
     }
     glfwMakeContextCurrent(window);
 
+    // platform / renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);          // second param install_callback=true will install GLFW callbacks and chain to existing ones.
+    ImGui_ImplOpenGL3_Init();
+
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         std::cout << "Error: Could not initialize GLAD\n";
@@ -52,9 +67,12 @@ int main()
     }
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetScrollCallback(window, scroll_callback);
+   
+    /* Locking mouse for Camera view
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    */
+    glfwSetScrollCallback(window, scroll_callback);
 
     float vertices[] = {
         // positions          // normals           // texture coords
@@ -137,9 +155,22 @@ int main()
     unsigned int specularMap = specContainer.loadTextureById();
     unsigned int emissionMap = emissiveContainer.loadTextureById();
 
+    static float scale = 0.2f;
+    static float cameraXPos = 0.2f;
+    static float cameraYPos = 0.2f;
+
+    bool show_config_window = true;
+    ImVec4 light_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    glm::vec3 lightPos(0.5f, 0.5f, 1.0f);
+
     // render loop
     while (!glfwWindowShouldClose(window))
     {
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
@@ -151,7 +182,40 @@ int main()
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 view = camera.getViewMatrix();
+
+        /* Camera based view
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
+        shader.setMat4("projection", projection);
+
+        glm::mat4 view = camera.getViewMatrix();
+        shader.setMat4("view", view);
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
+        shader.setMat4("projection", projection);
+
+        glm::mat4 view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        shader.setMat4("view", view);
+        */
+
+        glm::mat4 model = glm::mat4(1.0f);
+
+        if (show_config_window)
+        {
+            ImGui::Begin("Scene configuration");                                           
+
+            ImGui::SliderFloat("light x:", &lightPos.x, -2.0f, 2.0f);         // Edit float using a slider
+            ImGui::SliderFloat("light y:", &lightPos.y, -2.0f, 2.0f);         
+            ImGui::SliderFloat("light z:", &lightPos.z, -2.0f, 2.0f);         
+            ImGui::SliderFloat("light scale:", &scale, 0.1f, 2.0f);           
+
+            ImGui::ColorEdit3("light color", (float*)&light_color);                         // Edit 3 floats representing a color
+
+            ImGui::SliderFloat("camera zoom:", &camera.Zoom, 45.0f, 90.0f);
+
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            ImGui::End();
+        }
 
         shader.use();
 
@@ -168,13 +232,8 @@ int main()
         shader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
         shader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
 
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
         shader.setMat4("projection", projection);
-
-        glm::mat4 view = camera.getViewMatrix();
         shader.setMat4("view", view);
-
-        glm::mat4 model = glm::mat4(1.0f);
         shader.setMat4("model", model);
 
         glActiveTexture(GL_TEXTURE0);
@@ -188,21 +247,31 @@ int main()
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
         lightShader.use();
-
+        lightShader.setVec4("lightColor", light_color.x, light_color.y, light_color.z, light_color.w);
         lightShader.setMat4("projection", projection);
         lightShader.setMat4("view", view);
 
         model = glm::translate(model, lightPos);
-        model = glm::scale(model, glm::vec3(0.2f));
+        model = glm::scale(model, glm::vec3(scale));
         lightShader.setMat4("model", model);
 
         glBindVertexArray(lightVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    glfwDestroyWindow(window);
     glfwTerminate();
+
     return 0;
 }
 
@@ -218,11 +287,10 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
 
-    if (firstMouse)
+    if (!glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT))
     {
         lastX = xpos;
         lastY = ypos;
-        firstMouse = false;
     }
 
     float xoffset = xpos - lastX;
