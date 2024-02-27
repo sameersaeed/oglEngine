@@ -8,10 +8,14 @@
 #include <vector>
 
 enum Directions {
+    UP,
+    DOWN,
     FORWARD,
     BACKWARD,
     LEFT,
-    RIGHT
+    RIGHT,
+    ROTATE_LEFT,
+    ROTATE_RIGHT
 };
 
 const float YAW = -90.0f;
@@ -44,7 +48,7 @@ public:
         WorldUp = up;
         Yaw = yaw;
         Pitch = pitch;
-        updateCameraVectors();
+        updateVectors();
     }
 
     Camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float yaw, float pitch) : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
@@ -53,7 +57,7 @@ public:
         WorldUp = glm::vec3(upX, upY, upZ);
         Yaw = yaw;
         Pitch = pitch;
-        updateCameraVectors();
+        updateVectors();
     }
 
     glm::mat4 getViewMatrix();
@@ -63,7 +67,7 @@ public:
     void processScroll(float yoffset);
 
 private:
-    void updateCameraVectors();
+    void updateVectors();
 };
 
 #endif

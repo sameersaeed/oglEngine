@@ -9,14 +9,35 @@ glm::mat4 Camera::getViewMatrix()
 void Camera::processKeyboard(Directions direction, float deltaTime)
 {
     float velocity = MovementSpeed * deltaTime;
-    if (direction == FORWARD)
-        Position += Front * velocity;
-    if (direction == BACKWARD)
-        Position -= Front * velocity;
-    if (direction == LEFT)
-        Position -= Right * velocity;
-    if (direction == RIGHT)
-        Position += Right * velocity;
+    switch (direction)
+    {
+        case UP:
+            Position += Up * velocity;
+            break;
+        case DOWN:
+            Position -= Up * velocity;
+            break;
+        case FORWARD:
+            Position += Front * velocity;
+            break;
+        case BACKWARD:
+            Position -= Front * velocity;
+            break;
+        case LEFT:
+            Position -= Right * velocity;
+            break;
+        case RIGHT:
+            Position += Right * velocity;
+            break;
+        case ROTATE_LEFT:
+            Yaw -= velocity * 25;
+            updateVectors();
+            break;
+        case ROTATE_RIGHT:
+            Yaw += velocity * 25;
+            updateVectors();
+            break;
+    }
 }
 
 // for looking around
@@ -33,7 +54,7 @@ void Camera::processMouse(float xoffset, float yoffset)
     if (Pitch < -89.0f)
         Pitch = -89.0f;
 
-    updateCameraVectors();
+    updateVectors();
 }
 
 // for zooming
@@ -46,7 +67,7 @@ void Camera::processScroll(float yoffset)
         Zoom = 45.0f;
 }
 
-void Camera::updateCameraVectors()
+void Camera::updateVectors()
 {
     glm::vec3 front;
     front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
